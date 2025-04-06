@@ -261,3 +261,59 @@ extern "C" float4 FractalNoise3D(float4 lowColor, float4 highColor, float offset
     // Return the mixed color value.
     return mix(lowColor, highColor, cVal);
 }
+
+extern "C" float4 SphericalSimplexNoise3D(float4 lowColor, float4 highColor, float offsetX, float offsetY, float offsetZ, float zoom, float contrast, coreimage::destination dest) {
+    // 将纹理坐标[0,1]转换为球面坐标
+    float u = dest.coord().x / dest.extent().z; // 归一化x坐标 [0,1]
+    float v = dest.coord().y / dest.extent().w; // 归一化y坐标 [0,1]
+    
+    // 转换为球面坐标 (theta, phi)
+    float theta = 2.0f * M_PI_F * u + offsetX / zoom; // 经度 [0, 2π]
+    float phi = M_PI_F * v - M_PI_F / 2.0f + offsetY / zoom; // 纬度 [-π/2, π/2]
+    
+    // 转换为3D笛卡尔坐标
+    float x = cos(phi) * cos(theta);
+    float y = cos(phi) * sin(theta);
+    float z = sin(phi) + offsetZ / zoom;
+    
+    // 处理极点扭曲
+    float polarThreshold = 0.7f; // sin(phi) > 0.7 约等于纬度 > 45度
+    float noiseValue;
+    
+    if (abs(sin(phi)) > polarThreshold) {
+        // 在极点附近使用多重采样
+        float noiseSum = 0.0f;
+        int samples = 8;
+        float polarWeight = (1.0f - abs(sin(phi))) / (1.0f - polarThreshold);
+        
+        for (int i = 0; i < samples; i++) {
+            float sampleTheta = theta + (2.0f * M_PI_F * i) / samples;
+            float sampleX = cos(phi) * cos(sampleTheta);
+            float sampleY = cos(phi) * sin(sampleTheta);
+            float sampleZ = sin(phi) + offsetZ / zoom;
+            
+            noiseSum += SimplexNoise::noise(sampleX * zoom, sampleY * zoom, sampleZ * zoom);
+        }
+        
+        // 混合多重采样结果和单点采样结果
+        float singleSampleNoise = SimplexNoise::noise(x * zoom, y * zoom, z * zoom);
+        noiseValue = mix(noiseSum / samples, singleSampleNoise, polarWeight);
+    } else {
+        // 正常区域使用标准采样
+        noiseValue = SimplexNoise::noise(x * zoom, y * zoom, z * zoom);
+    }
+    
+    // 归一化到[0,1]范围
+    noiseValue = (noiseValue + 1.0f) / 2.0f;
+    
+    // 应用对比度调整
+    if (contrast == 1.0f) { return mix(lowColor, highColor, noiseValue); }
+    if (noiseValue == 0.0f) { return lowColor; }
+    if (noiseValue == 1.0f) { return highColor; }
+    
+    // 应用sigmoid函数调整对比度
+    float cVal = 1.0f / (1.0f + pow(noiseValue / (1.0f - noiseValue), -contrast));
+    
+    // 返回混合颜色值
+    return mix(lowColor, highColor, cVal);
+}
