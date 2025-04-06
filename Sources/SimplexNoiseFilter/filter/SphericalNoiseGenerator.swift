@@ -41,6 +41,12 @@ public final class SphericalNoiseGenerator: CIFilter {
     /// 对比度在(0.1 >= contrast > 1)范围内会降低输出的对比度。
     public var contrast: Float = 1.0
 
+    /// 纹理宽度，默认为1024（2:1宽高比的推荐值）
+    public var textureWidth: Float = 1024.0
+
+    /// 纹理高度，默认为512（2:1宽高比的推荐值）
+    public var textureHeight: Float = 512.0
+
     /// 通过从包中加载metallib来设置内核。
     private static var kernel: CIColorKernel? = {
         guard let url = Bundle.module.url(forResource: "SimplexNoise", withExtension: "ci.metallib")
@@ -71,6 +77,8 @@ public final class SphericalNoiseGenerator: CIFilter {
                 offsetZ,
                 zoom,
                 contrast,
+                textureWidth,
+                textureHeight,
             ]
         )
     }

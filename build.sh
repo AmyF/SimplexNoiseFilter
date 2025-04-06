@@ -1,0 +1,2 @@
+xcrun metal -c -I Sources/SimplexNoiseFilter/kernel/SimplexNoise.h -fcikernel Sources/SimplexNoiseFilter/kernel/SimplexNoise.ci.metal -o Sources/SimplexNoiseFilter/resources/SimplexNoise.ci.air
+xcrun metallib -cikernel Sources/SimplexNoiseFilter/resources/SimplexNoise.ci.air -o Sources/SimplexNoiseFilter/resources/SimplexNoise.ci.metalliw
