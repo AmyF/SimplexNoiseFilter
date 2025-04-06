@@ -322,3 +322,112 @@ extern "C" float4 SphericalSimplexNoise3D(float4 lowColor, float4 highColor, flo
     // 返回混合颜色值
     return mix(lowColor, highColor, cVal);
 }
+
+extern "C" float4 SphericalFractalNoise3D(
+    float4 lowColor,
+    float4 highColor,
+    float offsetX,
+    float offsetY,
+    float offsetZ,
+    float zoom,
+    float contrast,
+    float octaves,
+    float amplitude,
+    float lacunarity,  // 修正拼写
+    float persistence,
+    float width,
+    float height,
+    coreimage::destination dest
+) {
+    // 获取当前像素坐标
+    float x = dest.coord().x;
+    float y = dest.coord().y;
+    
+    // 将像素坐标归一化到[0,1]范围
+    float u = x / width;
+    float v = y / height;
+    
+    // 转换为球面坐标 (theta, phi)
+    float theta = 2.0f * M_PI_F * u + offsetX * (M_PI_F / 180.0f);
+    float phi = M_PI_F * v - M_PI_F / 2.0f + offsetY * (M_PI_F / 180.0f);
+    
+    // 转换为3D笛卡尔坐标（单位球面上的点）
+    const float earthRadius = 1.0f;
+    float radius = earthRadius + offsetZ / 100.0f;
+    float xyRadius = radius * cos(phi);
+    float sampleX = xyRadius * cos(theta);
+    float sampleY = xyRadius * sin(theta);
+    float sampleZ = radius * sin(phi);
+    
+    // 处理极点区域
+    float polarThreshold = 0.95f; // 仅处理极圈附近
+    float noiseValue = 0.0f;
+    
+    // 计算分形噪声
+    int oct = int(octaves);
+    if (abs(sin(phi)) > polarThreshold) {
+        // 极点区域多重采样
+        float noiseSum = 0.0f;
+        int samples = 2;
+        float polarWeight = smoothstep(0.0f, 1.0f,
+            (1.0f - abs(sin(phi))) / (1.0f - polarThreshold));
+        
+        for (int i = 0; i < samples; i++) {
+            float sampleTheta = theta + (2.0f * M_PI_F * i) / samples;
+            float x1 = xyRadius * cos(sampleTheta);
+            float y1 = xyRadius * sin(sampleTheta);
+            
+            noiseSum += SimplexNoise::fractal(
+                oct,
+                x1 * zoom,  // x
+                y1 * zoom,  // y
+                sampleZ * zoom,  // z
+                1.0f,       // freq (频率参数)
+                amplitude,   // amp (振幅)
+                lacunarity,  // lac (间隙度)
+                persistence  // per (持久度)
+            );
+        }
+        // 单点采样调用
+        float singleSample = SimplexNoise::fractal(
+            oct,
+            sampleX * zoom,
+            sampleY * zoom,
+            sampleZ * zoom,
+            1.0f,      // 新增频率参数
+            amplitude,
+            lacunarity,
+            persistence
+        );
+        noiseValue = mix(noiseSum / samples, singleSample, polarWeight);
+    } else {
+        // 正常区域
+        noiseValue = SimplexNoise::fractal(
+            oct,
+            sampleX * zoom,
+            sampleY * zoom,
+            sampleZ * zoom,
+            1.0f,      // 新增频率参数
+            amplitude,
+            lacunarity,
+            persistence
+        );
+    }
+    
+    // 确保噪声值在[-1, 1]范围
+    noiseValue = clamp(noiseValue, -1.0f, 1.0f);
+    
+    // 归一化到[0,1]范围
+    noiseValue = (noiseValue + 1.0f) / 2.0f;
+    
+    // 应用对比度调整
+    if (contrast == 1.0f) return mix(lowColor, highColor, noiseValue);
+    if (noiseValue <= 0.0f) return lowColor;
+    if (noiseValue >= 1.0f) return highColor;
+    
+    // 使用更安全的sigmoid计算
+    float safeNoise = max(0.0001f, min(0.9999f, noiseValue));
+    float cVal = 1.0f / (1.0f + pow(safeNoise / (1.0f - safeNoise), -contrast));
+    
+    return mix(lowColor, highColor, cVal);
+}
