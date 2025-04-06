@@ -12,7 +12,7 @@ A Metal-based implementation of the 3D Simplex noise generation algorithm. It pr
 _Note: The extent produced by this filter is infinite, so you'll need to crop it or use a fixed rendering rect as shown in the usage example._
 
 #### Usage
-```
+```swift
 let ciContext = CIContext(...) // Set up using Metal.
 let filter = SimplexNoiseGenerator()
 filter.contrast = 2.0 // Do any parameter changes you want.
@@ -37,7 +37,7 @@ This filter composes multiple "octaves" of Simplex Noise to create a more comple
 _Note: The extent produced by this filter is infinite, so you'll need to crop it or use a fixed rendering rect as shown in the usage example._
 
 #### Usage
-```
+```swift
 let ciContext = CIContext(...) // Set up using Metal.
 let filter = FractalNoiseGenerator()
 filter.contrast = 2.0 // Do any parameter changes you want.
